@@ -55,36 +55,80 @@ let
   inferServerPackageFromModpack =
     modpack:
     let
-      versions =
-        if modpack != null && modpack ? manifest && modpack.manifest ? versions then
-          modpack.manifest.versions
-        else
-          null;
+      manifest = if modpack != null && modpack ? manifest then modpack.manifest else null;
 
-      mcVersion = if versions == null then null else versions.minecraft or null;
+      firstNonNull = values: findFirst (value: value != null) null values;
+
+      manifestSection =
+        name:
+        let
+          section = attrByPath [ name ] { } manifest;
+        in
+        if isAttrs section then section else { };
+
+      versions = manifestSection "versions";
+      dependencies = manifestSection "dependencies";
+
+      fromSection = section: names: firstNonNull (map (name: attrByPath [ name ] null section) names);
+
+      fromManifest =
+        {
+          versionKeys ? [ ],
+          dependencyKeys ? [ ],
+        }:
+        firstNonNull [
+          (fromSection versions versionKeys)
+          (fromSection dependencies dependencyKeys)
+        ];
+
+      mcVersion = fromManifest {
+        versionKeys = [ "minecraft" ];
+        dependencyKeys = [ "minecraft" ];
+      };
       mcVersionEscaped = if mcVersion == null then null else escapeVersion mcVersion;
+
+      fabricVersion = fromManifest {
+        versionKeys = [ "fabric" ];
+        dependencyKeys = [
+          "fabric-loader"
+          "fabric"
+        ];
+      };
+
+      quiltVersion = fromManifest {
+        versionKeys = [ "quilt" ];
+        dependencyKeys = [
+          "quilt-loader"
+          "quilt"
+        ];
+      };
+
+      neoforgeVersion = fromManifest {
+        versionKeys = [ "neoforge" ];
+        dependencyKeys = [ "neoforge" ];
+      };
     in
     if modpack == null then
       null
     else if modpack ? minecraftServerPackage then
       modpack.minecraftServerPackage
-    else if versions == null || mcVersionEscaped == null then
+    else if mcVersionEscaped == null then
       null
-    else if versions ? fabric then
+    else if fabricVersion != null then
       maybeOverrideLoaderVersion (attrByPath [
         "fabricServers"
         "fabric-${mcVersionEscaped}"
-      ] null pkgs) versions.fabric
-    else if versions ? quilt then
+      ] null pkgs) fabricVersion
+    else if quiltVersion != null then
       maybeOverrideLoaderVersion (attrByPath [
         "quiltServers"
         "quilt-${mcVersionEscaped}"
-      ] null pkgs) versions.quilt
-    else if versions ? neoforge then
+      ] null pkgs) quiltVersion
+    else if neoforgeVersion != null then
       attrByPath
         [
           "neoforgeServers"
-          "${escapeVersion "${mcVersion}-${versions.neoforge}"}"
+          "${escapeVersion "${mcVersion}-${neoforgeVersion}"}"
         ]
         (attrByPath [
           "neoforgeServers"
@@ -640,7 +684,7 @@ in
                   When set, this module defaults
                   <option>symlinks.mods</option> to <literal>"''${modpack}/mods"</literal>
                   <option>symlinks.resourcepacks</option> to <literal>"''${modpack}/resourcepacks"</literal>
-                  <option>symlinks.shaderpacks</option> to <literal>"''${modpack}/shaderpacks"</literal>
+                  <option>files.shaderpacks</option> to <literal>"''${modpack}/shaderpacks"</literal>
                   and <option>files.config</option> to <literal>"''${modpack}/config"</literal>.
 
                   The default <option>package</option> is also inferred from modpack metadata when available.
@@ -723,10 +767,10 @@ in
                 symlinks = mkIf (config.modpack != null) {
                   mods = mkDefault "${config.modpack}/mods";
                   resourcepacks = mkDefault "${config.modpack}/resourcepacks";
-                  shaderpacks = mkDefault "${config.modpack}/shaderpacks";
                 };
 
                 files = mkIf (config.modpack != null) {
+                  shaderpacks = mkDefault "${config.modpack}/shaderpacks";
                   config = mkDefault "${config.modpack}/config";
                 };
 

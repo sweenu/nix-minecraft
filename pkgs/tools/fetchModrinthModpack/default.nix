@@ -70,7 +70,19 @@ let
             unzip -q "${srcPath}" -d pack-src
           fi
 
-          test -f pack-src/index.json
+          # Some packs ship files with restrictive permissions (e.g. 000),
+          # which would make jq/cp fail in the Nix build sandbox.
+          chmod -R u+rwX pack-src
+
+          if [ -f pack-src/index.json ]; then
+            manifestPath="pack-src/index.json"
+          elif [ -f pack-src/modrinth.index.json ]; then
+            # Newer .mrpack archives may use modrinth.index.json.
+            manifestPath="pack-src/modrinth.index.json"
+          else
+            echo "No Modrinth manifest found (expected index.json or modrinth.index.json)" >&2
+            exit 1
+          fi
 
           while IFS= read -r file; do
             if [ "${side}" != "both" ]; then
@@ -102,7 +114,7 @@ let
               echo "actual:   $actual" >&2
               exit 1
             fi
-          done < <(jq -c '.files[]' pack-src/index.json)
+          done < <(jq -c '.files[]' "$manifestPath")
 
           if [ -d pack-src/overrides ]; then
             cp -r pack-src/overrides/. .
@@ -126,7 +138,7 @@ let
           fi
 
           # Keep the source manifest in output for passthru consumers.
-          cp pack-src/index.json ./index.json
+          cp "$manifestPath" ./index.json
 
           runHook postBuild
         '';

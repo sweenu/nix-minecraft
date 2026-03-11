@@ -184,7 +184,7 @@ in
 }
 ```
 
-This sets the defaults `symlinks.mods = "${modpack}/mods"`, `symlinks.resourcepacks = "${modpack}/resourcepacks"`, `symlinks.shaderpacks = "${modpack}/shaderpacks"`, and `files.config = "${modpack}/config"`, and also infers `package` from the modpack metadata when available. You can still override any of these, or add extra files in a granular way.
+This sets the defaults `symlinks.mods = "${modpack}/mods"`, `symlinks.resourcepacks = "${modpack}/resourcepacks"`, `files.shaderpacks = "${modpack}/shaderpacks"`, and `files.config = "${modpack}/config"`, and also infers `package` from the modpack metadata when available. You can still override any of these, or add extra files in a granular way.
 
 **Note**: Be sure to use a stable URL (e.g. a git tag/commit) to the manifest, as it changing will cause the derivation to generate a different hash, breaking the build until you change it.
 
