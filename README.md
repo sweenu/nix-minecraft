@@ -169,12 +169,8 @@ in
 {
   services.minecraft-servers.servers.cool-modpack = {
     enable = true;
-    package = pkgs.fabricServers.fabric-1_18_2.override { loaderVersion = "0.14.9"; };
-    symlinks = {
-      "mods" = "${modpack}/mods";
-    };
+    modpack = modpack;
     files = {
-      "config" = "${modpack}/config";
       "config/mod1.yml" = "${modpack}/config/mod1.yml";
       "config/mod2.conf" = "${modpack}/config/mod2.conf";
       # You can add files not on the modpack, of course
@@ -186,7 +182,7 @@ in
 }
 ```
 
-This will symlink the modpack's final `mods` directory into the server's `mods` directory, and copy the specified config files into `config`. You can also do this for any files in the modpack you're interested in, in a granular way.
+This sets the defaults `symlinks.mods = "${modpack}/mods"`, `symlinks.resourcepacks = "${modpack}/resourcepacks"`, `symlinks.shaderpacks = "${modpack}/shaderpacks"`, and `files.config = "${modpack}/config"`, and also infers `package` from the modpack metadata when available. You can still override any of these, or add extra files in a granular way.
 
 **Note**: Be sure to use a stable URL (e.g. a git tag/commit) to the manifest, as it changing will cause the derivation to generate a different hash, breaking the build until you change it.
 
