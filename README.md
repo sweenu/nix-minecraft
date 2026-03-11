@@ -17,6 +17,7 @@ As of currently, it packages:
   - Velocity proxy
 - Various tools
   - `nix-modrinth-prefetch`
+  - `nix-modrinth-modpack-prefetch`
   - `fetchPackwizModpack`
   - `fetchModrinthModpack`
 
@@ -328,6 +329,31 @@ nix run github:Infinidoge/nix-minecraft#nix-modrinth-prefetch -- versionid
 (This helper script can also be used in a temporary shell with `nix shell github:Infinidoge/nix-minecraft#nix-modrinth-prefetch`)
 
 This `fetchurl` invocation directly fetches the mod, and can be copy-pasted to wherever necessary.
+
+#### `nix-modrinth-modpack-prefetch`
+
+[Source](./pkgs/tools/nix-modrinth-modpack-prefetch.nix)
+
+A helper script to fetch a Modrinth modpack archive (`.mrpack`) and output the `fetchModrinthModpack` invocation with a pinned `packHash`.
+
+You can pass any of the following:
+
+- A Modrinth version ID
+- A Modrinth version URL
+- A direct `.mrpack` URL
+
+```shell
+nix run github:Infinidoge/nix-minecraft#nix-modrinth-modpack-prefetch -- versionid
+```
+
+Example output:
+
+```nix
+fetchModrinthModpack {
+  url = "https://cdn.modrinth.com/data/PROJECT_ID/versions/VERSION_ID/modpack.mrpack";
+  packHash = "sha256-...";
+}
+```
 
 ## Modules
 
