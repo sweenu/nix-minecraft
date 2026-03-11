@@ -41,6 +41,62 @@ let
   nonEmptyValue = x: nonEmpty x && (x ? value -> nonEmpty x.value);
   nonEmpty = x: x != { } && x != [ ];
 
+  escapeVersion = version: replaceStrings [ "." " " ] [ "_" "_" ] (toString version);
+
+  maybeOverrideLoaderVersion =
+    pkg: loaderVersion:
+    if pkg == null || loaderVersion == null || !(pkg ? override) then
+      pkg
+    else
+      pkg.override {
+        inherit loaderVersion;
+      };
+
+  inferServerPackageFromModpack =
+    modpack:
+    let
+      versions =
+        if modpack != null && modpack ? manifest && modpack.manifest ? versions then
+          modpack.manifest.versions
+        else
+          null;
+
+      mcVersion = if versions == null then null else versions.minecraft or null;
+      mcVersionEscaped = if mcVersion == null then null else escapeVersion mcVersion;
+    in
+    if modpack == null then
+      null
+    else if modpack ? minecraftServerPackage then
+      modpack.minecraftServerPackage
+    else if versions == null || mcVersionEscaped == null then
+      null
+    else if versions ? fabric then
+      maybeOverrideLoaderVersion (attrByPath [
+        "fabricServers"
+        "fabric-${mcVersionEscaped}"
+      ] null pkgs) versions.fabric
+    else if versions ? quilt then
+      maybeOverrideLoaderVersion (attrByPath [
+        "quiltServers"
+        "quilt-${mcVersionEscaped}"
+      ] null pkgs) versions.quilt
+    else if versions ? neoforge then
+      attrByPath
+        [
+          "neoforgeServers"
+          "${escapeVersion "${mcVersion}-${versions.neoforge}"}"
+        ]
+        (attrByPath [
+          "neoforgeServers"
+          "neoforge-${mcVersionEscaped}"
+        ] null pkgs)
+        pkgs
+    else
+      attrByPath [
+        "vanillaServers"
+        "vanilla-${mcVersionEscaped}"
+      ] null pkgs;
+
   configToPath =
     name: config:
     if
@@ -316,7 +372,11 @@ in
       '';
       type = types.attrsOf (
         types.submodule (
-          { name, ... }:
+          {
+            name,
+            config,
+            ...
+          }:
           {
             options = {
               enable = mkEnableOpt ''
@@ -573,6 +633,23 @@ in
                 example = "pkgs.minecraftServers.vanilla-1_18_2";
               };
 
+              modpack = mkOption {
+                description = ''
+                  Optional modpack derivation to integrate automatically.
+
+                  When set, this module defaults
+                  <option>symlinks.mods</option> to <literal>"''${modpack}/mods"</literal>
+                  <option>symlinks.resourcepacks</option> to <literal>"''${modpack}/resourcepacks"</literal>
+                  <option>symlinks.shaderpacks</option> to <literal>"''${modpack}/shaderpacks"</literal>
+                  and <option>files.config</option> to <literal>"''${modpack}/config"</literal>.
+
+                  The default <option>package</option> is also inferred from modpack metadata when available.
+                '';
+                type = with types; nullOr package;
+                default = null;
+                example = literalExpression "pkgs.fetchPackwizModpack { ... }";
+              };
+
               jvmOpts = mkOpt' (
                 with types; coercedTo (listOf str) (lib.concatStringsSep " ") (separatedString " ")
               ) "-Xmx2G -Xms1G" "JVM options for this server.";
@@ -636,9 +713,25 @@ in
               };
             };
 
-            config = {
-              allowedSymlinks = [ "/nix/store" ];
-            };
+            config =
+              let
+                inferredPackage = inferServerPackageFromModpack config.modpack;
+              in
+              {
+                allowedSymlinks = [ "/nix/store" ];
+
+                symlinks = mkIf (config.modpack != null) {
+                  mods = mkDefault "${config.modpack}/mods";
+                  resourcepacks = mkDefault "${config.modpack}/resourcepacks";
+                  shaderpacks = mkDefault "${config.modpack}/shaderpacks";
+                };
+
+                files = mkIf (config.modpack != null) {
+                  config = mkDefault "${config.modpack}/config";
+                };
+
+                package = mkIf (inferredPackage != null) (mkDefault inferredPackage);
+              };
           }
         )
       );
